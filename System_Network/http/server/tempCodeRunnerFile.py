@@ -1,0 +1,1 @@
+response = {"device_id": device_id, "action": action}

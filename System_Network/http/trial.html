@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .data-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e7f3ff;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IoT Dashboard</h1>
+        <p>Real-time data from ESP devices:</p>
+        <div id="data-output" class="data-box">Loading...</div>
+        <p class="error" id="error"></p>
+    </div>
+
+    <script>
+        // Fetch data from the backend API
+        async function fetchData() {
+            try {
+                const response = await fetch('http://localhost:5000/data');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data.status === "success") {
+                    const output = document.getElementById('data-output');
+                    output.innerHTML = "";
+
+                    Object.entries(data.data).forEach(([device, values]) => {
+                        const deviceData = `<strong>${device}:</strong> ${values.join(', ')}`;
+                        const paragraph = document.createElement('p');
+                        paragraph.innerHTML = deviceData;
+                        output.appendChild(paragraph);
+                    });
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error').innerText = error.message;
+            }
+        }
+
+        // Refresh data every 5 seconds
+        setInterval(fetchData, 5000);
+        fetchData(); // Initial fetch
+    </script>
+</body>
+</html>
