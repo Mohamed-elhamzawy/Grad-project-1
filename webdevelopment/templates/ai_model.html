@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}YOLO Image Processor{% endblock %}
+
+{% block styles %}
+<style>
+/* move your entire <style> block here */
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>YOLO Image Processor</h1>
+
+<!-- Buttons -->
+<div class="buttons">
+    <form action="/run" method="post">
+        <button type="submit">🚀 Run YOLO on Images</button>
+    </form>
+    <form method="post" action="{{ url_for('start_cycle') }}">
+        <button type="submit">▶ Start Daily Cycle</button>
+    </form>
+</div>
+
+<!-- Images -->
+<h2 style="text-align: center;">Processed Images</h2>
+
+{% if images %}
+    <div class="image-gallery">
+        {% for img in images %}
+            <div class="image-card">
+                <img src="{{ url_for('static', filename='predictions/' + img) }}" alt="{{ img }}">
+                <p>{{ img }}</p>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p style="text-align: center;">No processed images yet.</p>
+{% endif %}
+{% endblock %}

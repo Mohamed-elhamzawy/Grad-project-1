@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="about-hero">
+    <h1>Meet the Team Behind the Greenhouse</h1>
+    <p class="intro">
+        We're a team of six engineers blending AI, embedded systems, and green architecture to develop an intelligent greenhouse system. Our solution improves sustainability and plant care through innovation.
+    </p>
+</div>
+
+<div class="team-photo">
+    <img src="{{ url_for('static', filename='Team.jpeg') }}" alt="Team Group Photo">
+</div>
+
+<div class="team-grid">
+    <!-- Supervisors -->
+    <div class="member-card">
+        <h3>Prof. Dr. Mohamed Abaza</h3>
+        <img src="{{ url_for('static', filename='abaza.jpeg') }}" alt="Dr. Mohamed Abaza">
+        <p class="role">Head of Electronics and Communication Engineering Department</p>
+        <p class="desc">
+            Ph.D. in Digital Communications from Université de Bretagne Occidentale, France. IEEE Senior Member with 40+ publications and over 900 citations. Expert in MIMO, optical wireless systems, and accreditation. Leads curriculum development and international student training programs.
+        </p>
+    </div>
+
+    <div class="member-card">
+        <h3>Associate Prof. Dr. Hesham Ali</h3>
+        <img src="{{ url_for('static', filename='h.jpeg') }}" alt="Biomedical Supervisor">
+        <p class="role">Head of Biomedical Engineering Department</p>
+        <p class="desc">
+            21+ years in academia and 15+ years in electronic design. Specialist in embedded systems, MEMS modeling, PCB design, and biomedical equipment. Reviewer at IEEE IoT Magazine and highly experienced in lab instrumentation, FPGA systems, and digital signal processing.
+        </p>
+    </div>
+
+    {% set members = [
+        {"name": "Belal Alaa Eldin", "img": "Belal.jpeg", "role": "Full Stack Developer", "desc": "Architected and implemented the system's backend and frontend infrastructure. Led integration between sensors, UI, and network communication for seamless remote control."},
+        {"name": "Marwan Mohamed Fouad", "img": "marwan.jpeg", "role": "AI Model Developer", "desc": "Created a deep learning model for plant disease classification. Developed and tested model deployment pipelines and real-time inference on edge devices."},
+        {"name": "Mohamed Emad el Hamzawy", "img": "hamzawy.jpeg", "role": "Sensor Fusion Engineer", "desc": "Designed hybrid algorithms using Kalman filters and averaging strategies to merge multi-source data, enabling more accurate and robust sensor readings."},
+        {"name": "Mohamed Mostafa", "img": "Mostafa.jpg", "role": "Research & Documentation Lead", "desc": "Provided critical technical documentation and academic support. Researched agricultural technologies to guide system decisions with evidence-based insights."},
+        {"name": "Raghad Osama", "img": "Raghad.jpeg", "role": "RC Rover Developer", "desc": "Built an autonomous rover for real-time greenhouse inspection and spraying. Integrated AI camera input and disease response into mobile operation."},
+        {"name": "Youssef Ahmed Abdelaziz", "img": "YoussefAhmed.jpeg", "role": "Greenhouse Architect & Hardware Designer", "desc": "Designed the physical greenhouse and internal circuitry. Ensured environmental durability and optimal sensor-actuator layout through CAD planning."}
+    ] %}
+
+    {% for m in members %}
+    <div class="member-card">
+        <h3>{{ m.name }}</h3>
+        <img src="{{ url_for('static', filename=m.img) }}" alt="{{ m.name }}">
+        <p class="role">{{ m.role }}</p>
+        <p class="desc">{{ m.desc }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+    .about-hero {
+        text-align: center;
+        padding: 80px 20px 40px;
+        background: linear-gradient(to right, #e6f9ea, #f4fef7);
+        border-bottom: 1px solid #cce8d4;
+    }
+
+    .about-hero h1 {
+        font-size: 2.8rem;
+        color: #207d49;
+        margin-bottom: 20px;
+        font-weight: 600;
+        letter-spacing: 1px;
+    }
+
+    .about-hero .intro {
+        max-width: 700px;
+        margin: auto;
+        font-size: 1.2rem;
+        color: #333;
+        line-height: 1.7;
+    }
+
+    .team-photo img {
+        display: block;
+        max-width: 90%;
+        margin: 40px auto;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+    }
+
+    .team-photo img:hover {
+        transform: scale(1.01);
+    }
+
+    .team-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 40px;
+        padding: 50px 20px;
+        background-color: #f7fcf9;
+    }
+
+    .member-card {
+        background: white;
+        border-radius: 16px;
+        padding: 30px 20px;
+        text-align: center;
+        box-shadow: 0 8px 18px rgba(0, 100, 0, 0.08);
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .member-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 12px 24px rgba(0, 100, 0, 0.15);
+    }
+
+    .member-card img {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-bottom: 15px;
+        border: 3px solid #a8d5ba;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .member-card h3 {
+        font-size: 1.4rem;
+        margin-bottom: 5px;
+        color: #1c5e35;
+        font-weight: 600;
+    }
+
+    .member-card .role {
+        font-weight: 500;
+        color: #2b9348;
+        margin-bottom: 12px;
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+    }
+
+    .member-card .desc {
+        font-size: 0.95rem;
+        color: #555;
+        line-height: 1.6;
+        max-width: 90%;
+    }
+
+    /* Responsive design */
+    @media (max-width: 1200px) {
+        .team-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .team-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}

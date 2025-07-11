@@ -1,0 +1,205 @@
+<!-- 
+<script>
+    function updateDashboard() {
+        $.getJSON("/data", function(data) {
+            let time = data.time;
+
+            // Temperature Chart
+            let temperature_traces = [];
+            for (let i = 0; i < 4; i++) {
+                temperature_traces.push({
+                    x: time,
+                    y: data.temperature[i],
+                    mode: 'lines',
+                    name: 'Temp ' + (i+1)
+                });
+            }
+            Plotly.react('temperature_chart', temperature_traces, { title: 'Temperature Over Time' });
+
+            // Humidity Chart
+            let humidity_traces = [];
+            for (let i = 0; i < 2; i++) {
+                humidity_traces.push({
+                    x: time,
+                    y: data.humidity[i],
+                    mode: 'lines',
+                    name: 'Humidity ' + (i+1)
+                });
+            }
+            Plotly.react('humidity_chart', humidity_traces, { title: 'Humidity Over Time' });
+
+            // Soil Moisture Chart
+            let soil_moisture_traces = [];
+            for (let i = 0; i < 2; i++) {
+                soil_moisture_traces.push({
+                    x: time,
+                    y: data.soil_moisture[i],
+                    mode: 'lines',
+                    name: 'Soil Moisture ' + (i+1)
+                });
+            }
+            Plotly.react('soil_moisture_chart', soil_moisture_traces, { title: 'Soil Moisture Over Time' });
+        });
+    }
+
+    // Update dashboard every 5 seconds
+    setInterval(updateDashboard, 5000);
+    updateDashboard();
+</script> -->
+<!-- <script>
+    function updateDashboard() {
+        $.getJSON("/data", function(data) {
+            let time = data.time;
+
+            // Temperature Chart
+            let temperature_traces = [];
+            if (data.temperature) {
+                let temperature_values = Object.values(data.temperature); // Extract values dynamically
+                for (let i = 0; i < temperature_values.length; i++) {
+                    temperature_traces.push({
+                        x: time,
+                        y: temperature_values[i],
+                        mode: 'lines',
+                        name: 'Temp ' + (i + 1)
+                    });
+                }
+            }
+            Plotly.react('temperature_chart', temperature_traces, { title: 'Temperature Over Time' });
+
+            // Humidity Chart
+            let humidity_traces = [];
+            if (data.humidity) {
+                let humidity_values = Object.values(data.humidity);
+                for (let i = 0; i < humidity_values.length; i++) {
+                    humidity_traces.push({
+                        x: time,
+                        y: humidity_values[i],
+                        mode: 'lines',
+                        name: 'Humidity ' + (i + 1)
+                    });
+                }
+            }
+            Plotly.react('humidity_chart', humidity_traces, { title: 'Humidity Over Time' });
+
+            // Soil Moisture Chart
+            let soil_moisture_traces = [];
+            if (data.soil_moisture) {
+                let soil_moisture_values = Object.values(data.soil_moisture);
+                for (let i = 0; i < soil_moisture_values.length; i++) {
+                    soil_moisture_traces.push({
+                        x: time,
+                        y: soil_moisture_values[i],
+                        mode: 'lines',
+                        name: 'Soil Moisture ' + (i + 1)
+                    });
+                }
+            }
+            Plotly.react('soil_moisture_chart', soil_moisture_traces, { title: 'Soil Moisture Over Time' });
+        });
+    }
+
+    // Update dashboard every 5 seconds
+    setInterval(updateDashboard, 5000);
+    updateDashboard();
+</script> -->
+
+<script>
+    function updateDashboard() {
+        $.getJSON("/data", function(data) {
+            let time = data.time;
+            let deviceIDs = data.DeviceID;
+            
+            function createTraces(sensorData, chartId, title, label) {
+                let traces = {};
+                
+                for (let i = 0; i < 4; i++) {
+                    let deviceId = deviceIDs[i];
+                    if (!(deviceId in traces)) {
+                        traces[deviceId] = { x: [], y: [], mode: 'lines', name: label + ' Device ' + deviceId };
+                    }
+                    traces[deviceId].x.push(time[i]);
+                    traces[deviceId].y.push(sensorData[i]);
+                }
+                
+                Plotly.react(chartId, Object.values(traces), { title: title });
+            }
+            
+            if (data.temperature) {
+                createTraces(data.temperature, 'temperature_chart', 'Temperature Over Time', 'Temp');
+            }
+            
+            if (data.humidity) {
+                createTraces(data.humidity, 'humidity_chart', 'Humidity Over Time', 'Humidity');
+            }
+            
+            if (data.soil_moisture) {
+                createTraces(data.soil_moisture, 'soil_moisture_chart', 'Soil Moisture Over Time', 'Soil Moisture');
+            }
+        });
+    }
+    
+    // Update dashboard every 5 seconds
+    setInterval(updateDashboard, 5000);
+    updateDashboard();
+</script>
+
+<!-- {% extends "base.html" %}
+
+{% block content %}
+
+<h1>Greenhouse Monitoring Dashboard</h1>
+
+<div id="temperature_chart"></div>
+<div id="humidity_chart"></div>
+<div id="soil_moisture_chart"></div>
+
+<script>
+    function updateDashboard() {
+        $.getJSON("/data", function(data) {
+            let time = data.time;
+
+            // Temperature Chart
+            let temperature_traces = [];
+            for (let i = 0; i < 4; i++) {
+                temperature_traces.push({
+                    x: time,
+                    y: data.temperature[i],
+                    mode: 'lines',
+                    name: 'Temp ' + (i+1)
+                });
+            }
+            Plotly.react('temperature_chart', temperature_traces, { title: 'Temperature Over Time' });
+
+            // Humidity Chart
+            let humidity_traces = [];
+            for (let i = 0; i < 4; i++) {
+                humidity_traces.push({
+                    x: time,
+                    y: data.humidity[i],
+                    mode: 'lines',
+                    name: 'Humidity ' + (i+1)
+                });
+            }
+            Plotly.react('humidity_chart', humidity_traces, { title: 'Humidity Over Time' });
+
+            // Soil Moisture Chart
+            let soil_moisture_traces = [];
+            for (let i = 0; i < 2; i++) {
+                soil_moisture_traces.push({
+                    x: time,
+                    y: data.soil_moisture[i],
+                    mode: 'lines',
+                    name: 'Soil Moisture ' + (i+1)
+                });
+            }
+            Plotly.react('soil_moisture_chart', soil_moisture_traces, { title: 'Soil Moisture Over Time' });
+        });
+    }
+
+    // Update dashboard every 5 seconds
+    setInterval(updateDashboard, 50000);
+    updateDashboard();
+</script>
+
+
+{% endblock %} -->

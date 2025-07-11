@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Welcome to the AI driven Greenhouse</h1>
+    <p>Monitor and control your greenhouse environment remotely.</p>
+</div>
+
+<div class="container">
+    <h1>Surveillance</h1>
+    <p>Two cameras for monitoring.</p>
+</div>
+
+<div class="container">
+    <img id="camera-stream" src="http://192.168.1.24:81/stream" width="400" height="400" alt="ESP32-CAM Stream" onerror="this.onerror=null; this.src='static/no-signal.jpg';">
+</div>
+
+{% endblock %}

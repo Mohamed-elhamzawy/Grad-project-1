@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>🌿 Greenhouse Sensor Dashboard</h1>
+
+<!-- Time Scale Controls -->
+<div class="chart-section">
+    <h2>Time Scale</h2>
+    <div class="button-group" id="time-scale-buttons">
+        <button onclick="setTimeScale('minutes')" id="scale-minutes" class="active">Minutes</button>
+        <button onclick="setTimeScale('hours')" id="scale-hours">Hours</button>
+        <button onclick="setTimeScale('days')" id="scale-days">Days</button>
+        <button onclick="setTimeScale('weeks')" id="scale-weeks">Weeks</button>
+    </div>
+</div>
+
+<!-- Weighted Chart -->
+<div class="chart-section">
+    <h2>Weighted Average Fusion</h2>
+    <div id="weightedChart" class="plot-container"></div>
+</div>
+
+<!-- Raw Sensor Chart -->
+<div class="chart-section">
+    <h2>Raw Sensor Data</h2>
+    <div class="button-group">
+        <button onclick="showRawCategory('temperature')" id="raw-temperature" class="active">🌡️ Temperature</button>
+        <button onclick="showRawCategory('humidity')" id="raw-humidity">💧 Humidity</button>
+        <button onclick="showRawCategory('soil')" id="raw-soil">🌱 Soil Moisture</button>
+    </div>
+    <div id="rawChart" class="plot-container"></div>
+</div>
+
+<!-- Kalman Filter Chart -->
+<div class="chart-section">
+    <h2>Kalman Filter Fusion</h2>
+    <div class="button-group">
+        <button onclick="showKalmanCategory('temperature')" id="kalman-temperature" class="active">🌡️ Temperature</button>
+        <button onclick="showKalmanCategory('humidity')" id="kalman-humidity">💧 Humidity</button>
+        <button onclick="showKalmanCategory('soil')" id="kalman-soil">🌱 Soil Moisture</button>
+    </div>
+    <div id="kalmanChart" class="plot-container"></div>
+</div>
+
+<!-- Plotly Script -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+<script>
+let rawCategories = { temperature: [], humidity: [], soil: [] };
+let kalmanCategories = { temperature: [], humidity: [], soil: [] };
+let weightedDataCache = [];
+let currentTimeScale = 'minutes';
+
+function setTimeScale(scale) {
+    currentTimeScale = scale;
+    document.querySelectorAll('#time-scale-buttons button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`scale-${scale}`).classList.add('active');
+
+    showRawCategory(document.querySelector(".button-group .active[id^='raw-']").id.split("-")[1]);
+    showKalmanCategory(document.querySelector(".button-group .active[id^='kalman-']").id.split("-")[1]);
+    plotWeighted(weightedDataCache);
+}
+
+function getWeekNumber(d) {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
+
+function formatTimestamps(timestamps) {
+    return timestamps.map(str => {
+        const date = new Date(str);
+        if (currentTimeScale === "weeks") return str;
+        if (isNaN(date.getTime())) return str;
+
+        const pad = n => String(n).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        const mm = pad(date.getMonth() + 1);
+        const dd = pad(date.getDate());
+        const HH = pad(date.getHours());
+        const MM = pad(date.getMinutes());
+
+        switch (currentTimeScale) {
+            case 'minutes':
+            case 'hours':
+                return `${yyyy}-${mm}-${dd} ${HH}:${MM}`;
+            case 'days':
+                return `${yyyy}-${mm}-${dd}`;
+            default:
+                return str;
+        }
+    });
+}
+
+function groupDataByScale(sensorData, scale) {
+    const grouped = [];
+
+    for (const sensor of sensorData) {
+        const buckets = {};
+
+        for (let i = 0; i < sensor.timestamps.length; i++) {
+            const date = new Date(sensor.timestamps[i]);
+
+            let key;
+            switch (scale) {
+                case 'minutes':
+                    key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}`;
+                    break;
+                case 'hours':
+                    key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()} ${date.getHours()}:00`;
+                    break;
+                case 'days':
+                    key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+                    break;
+                case 'weeks':
+                    const week = getWeekNumber(date);
+                    key = `${date.getFullYear()}-W${week}`;
+                    break;
+                default:
+                    key = date.toISOString();
+            }
+
+            if (!buckets[key]) buckets[key] = [];
+            buckets[key].push(sensor.values[i]);
+        }
+
+        const groupedTimestamps = Object.keys(buckets);
+        const groupedValues = groupedTimestamps.map(k =>
+            buckets[k].reduce((a, b) => a + b, 0) / buckets[k].length
+        );
+
+        grouped.push({
+            label: sensor.label || sensor.sensor_type,
+            timestamps: groupedTimestamps,
+            values: groupedValues
+        });
+    }
+
+    return grouped;
+}
+
+function categorize(data) {
+    const categories = { temperature: [], humidity: [], soil: [] };
+    for (const d of data) {
+        const name = d.label.toLowerCase();
+        if (name.includes("temp")) categories.temperature.push(d);
+        else if (name.includes("humid")) categories.humidity.push(d);
+        else if (name.includes("soil")) categories.soil.push(d);
+    }
+    return categories;
+}
+
+function plotCategory(data, elementId) {
+    if (data.length === 0) {
+        Plotly.purge(elementId);
+        document.getElementById(elementId).innerHTML = "<p style='text-align:center;color:#888;'>No data available.</p>";
+        return;
+    }
+
+    const grouped = groupDataByScale(data, currentTimeScale);
+
+    Plotly.react(elementId, grouped.map(sensor => ({
+        x: formatTimestamps(sensor.timestamps),
+        y: sensor.values,
+        mode: 'lines+markers',
+        name: sensor.label
+    })), {
+        xaxis: {
+            title: 'Time',
+            tickangle: -45
+        },
+        yaxis: { title: 'Value' },
+        margin: { t: 10, b: 100 }
+    });
+}
+
+function plotWeighted(data) {
+    weightedDataCache = data;
+    if (data.length === 0) {
+        Plotly.purge("weightedChart");
+        document.getElementById("weightedChart").innerHTML = "<p style='text-align:center;color:#888;'>No data available.</p>";
+        return;
+    }
+
+    const grouped = groupDataByScale(data, currentTimeScale);
+
+    Plotly.react("weightedChart", grouped.map(sensor => ({
+        x: formatTimestamps(sensor.timestamps),
+        y: sensor.values,
+        mode: 'lines+markers',
+        name: sensor.label || sensor.sensor_type || "Unknown"
+    })), {
+        xaxis: {
+            title: 'Time',
+            tickangle: -45
+        },
+        yaxis: { title: 'Fused Value' },
+        margin: { t: 10, b: 100 }
+    });
+}
+
+function setActive(prefix, type) {
+    document.querySelectorAll(`button[id^="${prefix}-"]`).forEach(btn => btn.classList.remove("active"));
+    document.getElementById(`${prefix}-${type}`).classList.add("active");
+}
+
+function showRawCategory(type) {
+    plotCategory(rawCategories[type], "rawChart");
+    setActive("raw", type);
+}
+
+function showKalmanCategory(type) {
+    plotCategory(kalmanCategories[type], "kalmanChart");
+    setActive("kalman", type);
+}
+
+async function fetchAndUpdateCharts() {
+    try {
+        const response = await fetch("/api/dashboard-data");
+        const data = await response.json();
+
+        rawCategories = categorize(data.raw);
+        kalmanCategories = categorize(data.kalman);
+        weightedDataCache = data.weighted;
+
+        const rawType = document.querySelector(".button-group .active[id^='raw-']").id.split("-")[1];
+        const kalmanType = document.querySelector(".button-group .active[id^='kalman-']").id.split("-")[1];
+
+        showRawCategory(rawType);
+        showKalmanCategory(kalmanType);
+        plotWeighted(weightedDataCache);
+    } catch (err) {
+        console.error("Failed to fetch update:", err);
+    }
+}
+
+fetchAndUpdateCharts();
+setInterval(fetchAndUpdateCharts, 10000);
+</script>
+
+<style>
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f4f6f9;
+    margin: 0;
+    padding: 0;
+    color: #333;
+}
+
+h1 {
+    text-align: center;
+    padding: 30px 0 10px;
+    font-size: 2.2rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.chart-section {
+    margin: 30px auto;
+    max-width: 1000px;
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+.button-group {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0 10px;
+    flex-wrap: wrap;
+}
+
+.button-group button {
+    padding: 10px 18px;
+    margin: 6px;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    background-color: #e0e6ed;
+    color: #333;
+    font-weight: 600;
+    transition: 0.2s ease;
+}
+
+.button-group button:hover {
+    background-color: #d0dbe8;
+}
+
+.button-group .active {
+    background-color: #2c7be5;
+    color: #fff;
+}
+
+.plot-container {
+    width: 100%;
+    height: 400px;
+}
+
+@media (max-width: 768px) {
+    .button-group {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .button-group button {
+        width: 80%;
+    }
+
+    .plot-container {
+        height: 350px;
+    }
+}
+</style>
+{% endblock %}

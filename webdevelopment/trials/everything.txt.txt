@@ -1,0 +1,998 @@
+│        <h1>Greenhouse Monitoring Dashboard</h1>
+│
+│        <div id="temperature_chart"></div>
+│        <div id="humidity_chart"></div>
+│        <div id="soil_moisture_chart"></div>
+│
+│        <script>
+│            function updateDashboard() {
+│                $.getJSON("/data", function(data) {
+│                    let time = data.time;
+│
+│                    // Temperature Chart
+│                    let temperature_traces = [];
+│                    for (let i = 0; i < 4; i++) {
+│                        temperature_traces.push({
+│                            x: time,
+│                            y: data.temperature[i],
+│                            mode: 'lines',
+│                            name: 'Temp ' + (i+1)
+│                        });
+│                    }
+│                    Plotly.react('temperature_chart', temperature_traces, { title: 'Temperature Over Time' });
+│
+│                    // Humidity Chart
+│                    let humidity_traces = [];
+│                    for (let i = 0; i < 4; i++) {
+│                        humidity_traces.push({
+│                            x: time,
+│                            y: data.humidity[i],
+│                            mode: 'lines',
+│                            name: 'Humidity ' + (i+1)
+│                        });
+│                    }
+│                    Plotly.react('humidity_chart', humidity_traces, { title: 'Humidity Over Time' });
+│
+│                    // Soil Moisture Chart
+│                    let soil_moisture_traces = [];
+│                    for (let i = 0; i < 2; i++) {
+│                        soil_moisture_traces.push({
+│                            x: time,
+│                            y: data.soil_moisture[i],
+│                            mode: 'lines',
+│                            name: 'Soil Moisture ' + (i+1)
+│                        });
+│                    }
+│                    Plotly.react('soil_moisture_chart', soil_moisture_traces, { title: 'Soil Moisture Over Time' });        
+│                });
+│            }
+│
+│            // Update dashboard every 5 seconds
+│            setInterval(updateDashboard, 50000);
+│            updateDashboard();
+│        </script>
+│
+│
+│        {% endblock %} -->
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   ├── dashboardupgrade.py
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        from flask import Blueprint, jsonify
+│        import json
+│        import os
+│        import time
+│
+│        dashboard_bp = Blueprint("dashboard", __name__)
+│
+│        # File to store the last known data
+│        DATA_FILE = "last_data.json"
+│
+│        # Function to load the last known data
+│        def load_last_data():
+│            if os.path.exists(DATA_FILE):
+│                with open(DATA_FILE, "r") as f:
+│                    return json.load(f)
+│            return {
+│                "time": [],
+│                "temperature": [[] for _ in range(6)],
+│                "humidity": [[] for _ in range(6)],
+│                "soil_moisture": [[] for _ in range(4)]
+│            }
+│
+│        # Function to save data
+│        def save_data(data):
+│            with open(DATA_FILE, "w") as f:
+│                json.dump(data, f)
+│
+│        # Global variable to store last known data
+│        last_data = load_last_data()
+│        last_update_time = time.time()
+│
+│        @dashboard_bp.route("/data")
+│        def get_data():
+│            global last_data, last_update_time
+│
+│            new_data = fetch_sensor_data()  # Replace this with your actual function
+│
+│            if new_data:  # If there's new data, update the stored data
+│                last_data = new_data
+│                last_update_time = time.time()
+│                save_data(last_data)  # Save updated data
+│
+│            return jsonify(last_data)
+│
+│        def fetch_sensor_data():
+│            """
+│            Simulates getting new sensor data.
+│            Replace this with your actual function that gets data from sensors.
+│            Returns None if no new data.
+│            """
+│            # Simulated condition where sometimes no new data arrives
+│            if time.time() - last_update_time < 10:  # Assume no new data within 10 sec
+│                return None
+│
+│            # Simulated new data (Replace with real sensor data fetching)
+│            return {
+│                "time": ["2025-02-22 12:00:00"],  # Add real timestamp
+│                "temperature": [[22.3, 22.5, 22.7, 22.6, 22.8, 22.9]],
+│                "humidity": [[50, 51, 49, 48, 52, 50]],
+│                "soil_moisture": [[30, 32, 29, 31]]
+│            }
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   ├── data_retrival.py
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        from sqlalchemy.orm import sessionmaker
+│        from database_setup import engine, SensorData,UserInteraction
+│        import pandas as pd
+│
+│        # this could also be used for sensor fusion
+│
+│        #  Create session
+│        Session = sessionmaker(bind=engine)
+│        session = Session()
+│
+│        #  Fetch all readings as a list of dictionaries
+│        data = session.query(UserInteraction).all()
+│
+│        # Convert SQLAlchemy objects to dictionaries
+│        result_list = [
+│            {"DeviceID": d.DeviceID, "UserID": d.UserID, "Action": d.Action, "Timestamp": d.Timestamp}
+│            for d in data
+│        ]
+│
+│        #  Close session
+│        session.close()
+│
+│        print("\n Retrieved Sensor Readings List:")
+│        print(result_list)
+│        # data=result_list
+│        # # Convert to Pandas DataFrame
+│        # df = pd.DataFrame(data)
+│
+│        # # Convert 'Timestamp' column to datetime format (if needed)
+│        # df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+│
+│        # # Convert Timestamp to datetime
+│        # df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+│
+│        # # Pivot the table to restructure data
+│        # df_pivot = df.pivot_table(index=["Timestamp", "DeviceID"], columns="SensorType", values="Value", aggfunc="first") 
+│
+│        # # Rename columns explicitly to match the required output
+│        # df_pivot.columns = df_pivot.columns.rename(None)  # Remove MultiIndex column names
+│        # df_pivot.rename(columns={
+│        #     "temperature": "temperature",
+│        #     "humidity": "humidity",
+│        #     "soil_moisture": "soil_moisture"
+│        # }, inplace=True)
+│
+│        # # Reset index to bring columns back
+│        # df_pivot.reset_index(inplace=True)
+│
+│        # # Rename Timestamp to time
+│        # df_pivot.rename(columns={"Timestamp": "time"}, inplace=True)
+│
+│        # # Display result
+│        # print(df_pivot)
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   ├── database_setup.py
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, ForeignKey
+│        from sqlalchemy.orm import relationship, sessionmaker, DeclarativeBase
+│        from datetime import datetime
+│
+│        # Database connection
+│        DATABASE_URL = "sqlite:///greenhouse.db"
+│        engine = create_engine(DATABASE_URL, echo=True)
+│
+│        # Create session factory
+│        SessionLocal = sessionmaker(bind=engine)
+│
+│        #  Base Model
+│        class Base(DeclarativeBase):
+│            pass
+│
+│        #  Devices Table
+│        class Device(Base):
+│            __tablename__ = "devices"
+│
+│            DeviceID = Column(Integer, primary_key=True)
+│            DeviceName = Column(String(50), nullable=False)
+│            Location = Column(String(100))
+│            Status = Column(String(20))  # e.g., "Active", "Inactive"
+│            Type = Column(String(50))  # e.g., "ESP32", "Raspberry Pi"
+│
+│            sensor_data = relationship("SensorData", back_populates="device")
+│            user_interactions = relationship("UserInteraction", back_populates="device")
+│
+│        #  SensorData Table
+│        class SensorData(Base):
+│            __tablename__ = "sensor_data"
+│
+│            DataID = Column(Integer, primary_key=True)
+│            DeviceID = Column(Integer, ForeignKey("devices.DeviceID"))
+│            Timestamp = Column(DateTime, default=datetime.utcnow)
+│            SensorType = Column(String(50))  # e.g., "temperature", "humidity"
+│            Value = Column(Float)  # Sensor reading value
+│
+│            device = relationship("Device", back_populates="sensor_data")
+│
+│        #  UserInteractions Table
+│        class UserInteraction(Base):
+│            __tablename__ = "user_interactions"
+│
+│            InteractionID = Column(Integer, primary_key=True)
+│            UserID = Column(Integer)  # Assuming users are stored elsewhere
+│            DeviceID = Column(Integer, ForeignKey("devices.DeviceID"))
+│            Action = Column(String(20), nullable=False)  # e.g., "Turn On", "Turn Off"
+│            Timestamp = Column(DateTime, default=datetime.utcnow)
+│
+│            device = relationship("Device", back_populates="user_interactions")
+│
+│        #  Create Tables in SQLite
+│        Base.metadata.create_all(engine)
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   ├── database_setups.py
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        from sqlalchemy import (
+│            create_engine, Column, Integer, Float, String, DateTime, ForeignKey
+│        )
+│        from sqlalchemy.orm import relationship, sessionmaker, DeclarativeBase
+│        from datetime import datetime
+│
+│        # Database connection
+│        DATABASE_URL = "sqlite:///greenhouse.db"
+│        engine = create_engine(DATABASE_URL, echo=True)
+│        SessionLocal = sessionmaker(bind=engine)
+│
+│        # Base class
+│        class Base(DeclarativeBase):
+│            pass
+│
+│        # Devices Table
+│        class Device(Base):
+│            __tablename__ = "devices"
+│
+│            DeviceID = Column(Integer, primary_key=True)
+│            DeviceName = Column(String(50), nullable=False)
+│            Location = Column(String(100))
+│            Status = Column(String(20))  # e.g., "Active", "Inactive"
+│            Type = Column(String(50))    # e.g., "ESP32", "Raspberry Pi"
+│
+│            # Relationships
+│            sensors = relationship("Sensor", back_populates="device", cascade="all, delete-orphan")
+│            sensor_data = relationship("SensorData", secondary="sensors", viewonly=True)
+│            user_interactions = relationship("UserInteraction", back_populates="device", cascade="all, delete-orphan")      
+│            kalman_fusions = relationship("KalmanFilterFusionData", back_populates="device", cascade="all, delete-orphan")  
+│            weighted_fusions = relationship("WeightedAverageFusionData", back_populates="device", cascade="all, delete-orphan")
+│
+│        # Sensors Table
+│        class Sensor(Base):
+│            __tablename__ = "sensors"
+│
+│            SensorID = Column(Integer, primary_key=True)
+│            DeviceID = Column(Integer, ForeignKey("devices.DeviceID"), nullable=False)
+│            SensorType = Column(String(50))  # e.g., "DHT", "SoilMoisture"
+│            SensorIndex = Column(Integer)    # To distinguish multiple sensors of same type
+│            Location = Column(String(100))   # e.g., "Top Left"
+│            Status = Column(String(20), default="Active")
+│
+│            device = relationship("Device", back_populates="sensors")
+│            sensor_data = relationship("SensorData", back_populates="sensor", cascade="all, delete-orphan")
+│
+│        # SensorData Table
+│        class SensorData(Base):
+│            __tablename__ = "sensor_data"
+│
+│            DataID = Column(Integer, primary_key=True)
+│            SensorID = Column(Integer, ForeignKey("sensors.SensorID"), nullable=False)
+│            Timestamp = Column(DateTime, default=datetime.utcnow)
+│            Value = Column(Float, nullable=False)
+│
+│            sensor = relationship("Sensor", back_populates="sensor_data")
+│
+│        # UserInteractions Table
+│        class UserInteraction(Base):
+│            __tablename__ = "user_interactions"
+│
+│            InteractionID = Column(Integer, primary_key=True)
+│            UserID = Column(Integer)
+│            DeviceID = Column(Integer, ForeignKey("devices.DeviceID"), nullable=False)
+│            ActuatorID = Column(Integer, ForeignKey("actuators.ActuatorID"))  # Optional, if interaction is with an actuator
+│            Action = Column(String(20), nullable=False)  # e.g., "Turn On", "Turn Off"
+│            Timestamp = Column(DateTime, default=datetime.utcnow)
+│
+│            device = relationship("Device", back_populates="user_interactions")
+│
+│        # Kalman Filter Fusion Table
+│        class KalmanFilterFusionData(Base):
+│            __tablename__ = "kalman_filter_fusion"
+│
+│            FusionID = Column(Integer, primary_key=True)
+│            SensorID = Column(Integer, ForeignKey("kalmanFilterFusionData.SensorID"), nullable=False)
+│            Timestamp = Column(DateTime, default=datetime.utcnow)
+│            FusedValue = Column(Float, nullable=False)
+│
+│
+│            sensor = relationship("Sensor", back_populates="kalmanFilterFusionData"
+│
+│        # Weighted Average Fusion Table
+│        class WeightedAverageFusionData(Base):
+│            __tablename__ = "weighted_average_fusion"
+│
+│            FusionID = Column(Integer, primary_key=True)
+│            DeviceID = Column(Integer, ForeignKey("devices.DeviceID"), nullable=False)
+│            SensorType = Column(String(50))  # Optional
+│            Timestamp = Column(DateTime, default=datetime.utcnow)
+│            FusedValue = Column(Float, nullable=False)
+│
+│            device = relationship("Device", back_populates="weighted_fusions")
+│
+│        # Actuators Table
+│        class Actuator(Base):
+│            __tablename__ = "actuators"
+│
+│            ActuatorID = Column(Integer, primary_key=True)
+│            ActuatorName = Column(String(50), nullable=False, unique=True)
+│            Status = Column(String(20), nullable=False)  # e.g., "On", "Off"
+│            LastUpdated = Column(DateTime, default=datetime.utcnow)
+│            UserID = Column(Integer)  # Refers to the user who last updated it
+│
+│            def __repr__(self):
+│                return f"<Actuator(Name={self.ActuatorName}, Status={self.Status})>"
+│
+│        # Create all tables
+│        Base.metadata.create_all(engine)
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   ├── indexprev.html
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        {% extends "base.html" %}
+│
+│        {% block content %}
+│        <div class="container">
+│            <h1>Welcome to the AI driven Greenhouse</h1>
+│            <p>Monitor and control your greenhouse environment remotely.</p>
+│        </div>
+│
+│        <div class="container">
+│            <h1>Surveillance</h1>
+│            <p>Two cameras for monitoring.</p>
+│        </div>
+│
+│        <div class="container">
+│            <img id="camera-stream" src="http://192.168.1.24:81/stream" width="400" height="400" alt="ESP32-CAM Stream" onerror="this.onerror=null; this.src='static/no-signal.jpg';">
+│        </div>
+│
+│        {% endblock %}
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   ├── network.py
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        from flask import request, jsonify
+│        from database_setup import SessionLocal, SensorData, Device,UserInteraction
+│        from datetime import datetime
+│
+│        # Device (Microcontrollers) authentication credentials for sending sensor data to the server
+│        credentials = {
+│            "esp_Temp_humid_1": "esp_password",
+│            "esp_Soil_moisture_1": "esp_password"
+│        }
+│
+│        def action_based_on_sensor(DeviceName, temperature=0, humidity=0, soil_moisture=0):
+│            session = SessionLocal()
+│            try:
+│                if DeviceName == "esp_Temp_humid_1" and temperature > 30:
+│                    session.add(UserInteraction(DeviceID=11, UserID=5000, Action="blink_led", Timestamp=datetime.utcnow())) 
+│                    session.commit()
+│                    return "blink_led"
+│
+│                elif DeviceName == "esp_Soil_moisture_1" and soil_moisture > 30:
+│                    session.add(UserInteraction(DeviceID=12, UserID=5000, Action="blink_led", Timestamp=datetime.utcnow())) 
+│                    session.commit()
+│                    return "blink_led"
+│
+│                return "no_action"
+│
+│            finally:
+│                session.close()
+│
+│
+│
+│        def store_sensor_data(device_id, DeviceName, temperature=None, humidity=None, soil_moisture=None):
+│            session = SessionLocal()
+│
+│            # Ensure device exists in the database
+│            device = session.query(Device).filter_by(DeviceID=device_id).first()
+│            if not device:
+│                device = Device(DeviceID=device_id, DeviceName=DeviceName, Type="ESP32", Location="Unknown", Status="Active")
+│                session.add(device)
+│                session.commit()
+│                session.refresh(device)  # Ensure we have the latest DeviceID
+│
+│            # Store sensor readings for the specific device ID received from ESP
+│            if temperature is not None and device_id in {1, 2, 3}:
+│                session.add(SensorData(DeviceID=device_id, SensorType="temperature", Value=temperature, Timestamp=datetime.utcnow()))
+│
+│            if humidity is not None and device_id in {4, 5, 6}:
+│                session.add(SensorData(DeviceID=device_id, SensorType="humidity", Value=humidity, Timestamp=datetime.utcnow()))
+│
+│            if soil_moisture is not None and device_id in {7, 8}:
+│                session.add(SensorData(DeviceID=device_id, SensorType="soil_moisture", Value=soil_moisture, Timestamp=datetime.utcnow()))
+│
+│            session.commit()
+│            session.close()
+│
+│        def receive_sensor_data(request):
+│            # Get Authorization header
+│            auth = request.authorization
+│            if not auth or credentials.get(auth.username) != auth.password:
+│                return jsonify({"error": "Unauthorized"}), 401
+│
+│            try:
+│                data = request.json
+│                if not data:
+│                    return jsonify({"error": "Invalid or missing JSON payload"}), 400
+│
+│                device_id = data.get('DeviceID')  # This is an integer
+│                DeviceName = data.get('DeviceName')  # This is a string
+│                temperature = data.get('temperature')
+│                humidity = data.get('humidity')
+│                soil_moisture = data.get('soil_moisture')  # Fixed key
+│
+│                if not device_id or not DeviceName:
+│                    return jsonify({"error": "Missing 'DeviceID' or 'DeviceName' in payload"}), 400
+│
+│                print(f"Received JSON payload: {data}")
+│
+│                # Store the data in the database
+│                store_sensor_data(device_id, DeviceName, temperature, humidity, soil_moisture)
+│
+│                # Determine action based on sensor data
+│                action = action_based_on_sensor(DeviceName, temperature, humidity, soil_moisture)
+│
+│                response = {"DeviceName": DeviceName, "action": action}
+│                return jsonify(response)
+│
+│            except Exception as e:
+│                print(f"Error processing request: {e}")
+│                return jsonify({"error": "Internal Server Error"}), 500
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   ├── newer_network.py
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        from flask import request, jsonify
+│        import time
+│        from sqlalchemy import desc
+│        from datetime import datetime
+│        from sqlalchemy.orm import Session
+│        from database_setup import (
+│            SessionLocal, SensorData, Sensor, Device, UserInteraction,
+│            Actuator, WeightedAverageFusionData, KalmanFilterFusionData
+│        )
+│        from weightedAverage import process_weighted_fusion
+│
+│        # Authentication credentials for devices
+│        credentials = {
+│            "Ventilation_System_ESP": "password",
+│            "Irrigation_System_ESP": "password",
+│            "web_control": "web_password"
+│        }
+│
+│        # Constants
+│        DEFAULT_USER_ID = 5000  # Server user
+│        TEMP_THRESHOLD = 30
+│        HUM_THRESHOLD = 40
+│        SOIL_MOISTURE_THRESHOLD = 30
+│
+│        TEMP_SENSOR_IDS = [2099, 2092, 3093]
+│        HUM_SENSOR_IDS = [2091, 2034, 3027]
+│        WEIGHTS = [0.5, 0.3, 0.2]
+│
+│        # Actuator Names
+│        INTAKE_SHUTTER = "intake_shutter"
+│        WATER_PUMP = "water_pump"
+│        VENTILATION_FAN = "ventilation_fan"
+│
+│        # Device IDs
+│        Ventilation_System_ESP_ID = 2000
+│        Irrigation_System_ESP_ID = 3000
+│
+│        soil_sensor_1id = 2005
+│        soil_sensor_2id = 3002
+│
+│
+│        def get_fused_values_by_sensors(session: Session, *sensor_ids: int):
+│            fused_values = {}
+│
+│            if not sensor_ids:
+│                return fused_values  # No IDs provided → return empty
+│
+│            for sensor_id in sensor_ids:
+│                if sensor_id is None:
+│                    continue
+│                fusion = (
+│                    session.query(KalmanFilterFusionData)
+│                    .filter_by(SensorID=sensor_id)
+│                    .order_by(desc(KalmanFilterFusionData.Timestamp))
+│                    .first()
+│                )
+│                if fusion:
+│                    fused_values[sensor_id] = fusion.FusedValue
+│
+│            return fused_values
+│
+│
+│        def log_user_action(session, device_id, action, user_id, actuator_id):
+│            session.add(UserInteraction(
+│                DeviceID=device_id,
+│                Action=action,
+│                UserID=user_id,
+│                ActuatorID=actuator_id,
+│                Timestamp=datetime.utcnow()
+│            ))
+│
+│
+│        def control_actuator(session, actuator_name, status, user_id):
+│            actuator = session.query(Actuator).filter_by(ActuatorName=actuator_name).first()
+│            if not actuator:
+│                actuator = Actuator(
+│                    ActuatorName=actuator_name,
+│                    Status=status,
+│                    LastUpdated=datetime.utcnow(),
+│                    UserID=user_id
+│                )
+│                session.add(actuator)
+│            else:
+│                if actuator.Status != status:
+│                    actuator.Status = status
+│                    actuator.LastUpdated = datetime.utcnow()
+│                    actuator.UserID = user_id
+│                    log_user_action(
+│                        session,
+│                        device_id=actuator.ActuatorID,
+│                        action=f"{actuator_name}_{status.lower()}",
+│                        user_id=user_id,
+│                        actuator_id=actuator.ActuatorID
+│                    )
+│            session.commit()
+│            return actuator
+│
+│
+│        def get_latest_fused_temperature_humidity(session):
+│            latest_temp = session.query(WeightedAverageFusionData).filter_by(
+│                SensorType="temperature").order_by(desc(WeightedAverageFusionData.Timestamp)).first()
+│            latest_hum = session.query(WeightedAverageFusionData).filter_by(
+│                SensorType="humidity").order_by(desc(WeightedAverageFusionData.Timestamp)).first()
+│
+│            return {
+│                "temperature": latest_temp.FusedValue if latest_temp else None,
+│                "humidity": latest_hum.FusedValue if latest_hum else None
+│            }
+│
+│
+│        def action_based_on_sensor(user_id=DEFAULT_USER_ID):
+│            with SessionLocal() as session:
+│                result = get_fused_values_by_sensors(session, soil_sensor_1id, soil_sensor_2id)
+│                soil1 = result.get(soil_sensor_1id)
+│                soil2 = result.get(soil_sensor_2id)
+│
+│                soil_moisture = None
+│                if soil1 is not None and soil2 is not None:
+│                    average = (soil1 + soil2) / 2
+│                    if 0 <= average <= 100:
+│                        soil_moisture = average
+│                elif soil1 is not None:
+│                    if 0 <= soil1 <= 100:
+│                        soil_moisture = soil1
+│                elif soil2 is not None:
+│                    if 0 <= soil2 <= 100:
+│                        soil_moisture = soil2
+│                # Else → soil_moisture stays None
+│
+│                temperature=process_weighted_fusion(sensor_ids=TEMP_SENSOR_IDS, weights=WEIGHTS, sensor_type="Temperature") 
+│
+│                # Call for humidity
+│                humidity=process_weighted_fusion(sensor_ids=HUM_SENSOR_IDS, weights=WEIGHTS, sensor_type="Humidity")        
+│
+│                actions = []
+│
+│                try:
+│                    if temperature is not None and humidity is not None:
+│                        if temperature > TEMP_THRESHOLD or humidity > HUM_THRESHOLD:
+│                            control_actuator(session, VENTILATION_FAN, "on", user_id)
+│                            control_actuator(session, INTAKE_SHUTTER, "on", user_id)
+│                            actions.append("Ventilation_ON")
+│                        elif temperature < TEMP_THRESHOLD and humidity < HUM_THRESHOLD:
+│                            control_actuator(session, VENTILATION_FAN, "off", user_id)
+│                            control_actuator(session, INTAKE_SHUTTER, "off", user_id)
+│                            actions.append("Ventilation_OFF")
+│
+│                    if soil_moisture is not None:
+│                        if soil_moisture < SOIL_MOISTURE_THRESHOLD:
+│                            control_actuator(session, WATER_PUMP, "on", user_id)
+│                            actions.append("Irrigation_ON")
+│                        else:
+│                            control_actuator(session, WATER_PUMP, "off", user_id)
+│                            actions.append("Irrigation_OFF")
+│
+│                    session.commit()
+│                    return ", ".join(actions) if actions else "none"
+│                except Exception as e:
+│                    session.rollback()
+│                    print(f"[ERROR] Failed to perform action: {e}")
+│                    return "error"
+│
+│
+│
+│        def get_or_create_device(session, device_id, device_name):
+│            device = session.query(Device).filter_by(DeviceID=device_id).first()
+│            if not device:
+│                device = Device(DeviceID=device_id, DeviceName=device_name, Location="Unknown", Status="Active")
+│                session.add(device)
+│                session.commit()
+│                session.refresh(device)
+│            return device
+│
+│
+│        def get_or_create_sensor(session,sensor_id, device_id, sensor_type):
+│            sensor = session.query(Sensor).filter_by(SensorID=sensor_id, SensorType=sensor_type).first()
+│            if not sensor:
+│                sensor = Sensor(SensorID=sensor_id, DeviceID=device_id, SensorType=sensor_type, Location="Unknown", Status="Active")
+│                session.add(sensor)
+│                session.commit()
+│                session.refresh(sensor)
+│            return sensor
+│
+│
+│        def store_sensor_value(session, sensor, value):
+│            session.add(SensorData(SensorID=sensor.SensorID, Value=value, Timestamp=datetime.utcnow()))
+│
+│
+│        def store_sensor_data(device_id, device_name,sensor_id,
+│                              temperature=None, filtered_temperature=None,
+│                              humidity=None, filtered_humidity=None,
+│                              soil_moisture=None, filtered_soil_moisture=None):
+│            with SessionLocal() as session:
+│                try:
+│                    get_or_create_device(session, device_id, device_name)
+│
+│                    if temperature is not None:
+│                        sensor = get_or_create_sensor(session, device_id, "temperature")
+│                        store_sensor_value(session, sensor, temperature)
+│
+│                    if filtered_temperature is not None:
+│                        sensor = get_or_create_sensor(session, device_id, "temperature_filtered")
+│                        store_sensor_value(session, sensor, filtered_temperature)
+│
+│                    if humidity is not None:
+│                        sensor = get_or_create_sensor(session, device_id, "humidity")
+│                        store_sensor_value(session, sensor, humidity)
+│
+│                    if filtered_humidity is not None:
+│                        sensor = get_or_create_sensor(session, device_id, "humidity_filtered")
+│                        store_sensor_value(session, sensor, filtered_humidity)
+│
+│                    if soil_moisture is not None:
+│                        sensor = get_or_create_sensor(session, device_id, "soil_moisture")
+│                        store_sensor_value(session, sensor, soil_moisture)
+│
+│                    if filtered_soil_moisture is not None:
+│                        sensor = get_or_create_sensor(session, device_id, "soil_moisture_filtered")
+│                        store_sensor_value(session, sensor, filtered_soil_moisture)
+│
+│                    session.commit()
+│                except Exception as e:
+│                    session.rollback()
+│                    print(f"[ERROR] Failed to store sensor data: {e}")
+│
+│
+│        def receive_sensor_data(request):
+│            auth = request.authorization
+│            if not auth or credentials.get(auth.username) != auth.password:
+│                return jsonify({"error": "Unauthorized"}), 401
+│
+│            try:
+│                data = request.get_json()
+│                if not data:
+│                    return jsonify({"error": "Invalid or missing JSON payload"}), 400
+│
+│                device_id = data.get('DeviceID')
+│                device_name = data.get('DeviceName')
+│                sensor_id = data.get('SensorID')
+│                if not device_id or not device_name:
+│                    return jsonify({"error": "Missing DeviceID or DeviceName"}), 400
+│
+│                temperature = data.get('temperature')
+│                filtered_temperature = data.get('filtered_temperature')
+│                humidity = data.get('humidity')
+│                filtered_humidity = data.get('filtered_humidity')
+│                soil_moisture = data.get('soil_moisture')
+│                filtered_soil_moisture = data.get('filtered_soil_moisture')
+│
+│                store_sensor_data(device_id, device_name,sensor_id,
+│                                  temperature, filtered_temperature,
+│                                  humidity, filtered_humidity,
+│                                  soil_moisture, filtered_soil_moisture)
+│
+│                print(f"[INFO] Received data from DeviceID: {device_id}, SensorID: {sensor_id}")
+│                # Optional: wait for fusion update to complete if it's not sync
+│                time.sleep(5)
+│
+│                action_result = action_based_on_sensor()
+│
+│                with SessionLocal() as session:
+│                    latest = get_latest_fused_temperature_humidity(session)
+│                    soil_data = get_fused_values_by_sensors(session, soil_sensor_1id, soil_sensor_2id)
+│                    avg_soil = None
+│                    if soil_data:
+│                        values = list(soil_data.values())
+│                        avg_soil = sum(values) / len(values) if values else None
+│
+│                return jsonify({
+│                    "status": "success",
+│                    "action": action_result,
+│                    "temperature": latest["temperature"],
+│                    "humidity": latest["humidity"],
+│                    "soil_moisture": avg_soil
+│                }), 200
+│
+│            except Exception as e:
+│                print(f"[ERROR] Failed to receive/process sensor data: {e}")
+│                return jsonify({"error": "Internal Server Error"}), 500
+│        ↑↑↑ END OF FILE ↑↑↑
+
+│   └── old_network.py
+│        ↓↓↓ FILE CONTENT ↓↓↓
+│        from flask import request, jsonify
+│        from webdevelopment.database_setup import SessionLocal, SensorData, Device, UserInteraction, Actuator, WeightedAverageFusionData
+│        from datetime import datetime
+│        from webdevelopment.weightedAverage import process_weighted_fusion
+│
+│        # Authentication credentials for devices
+│        credentials = {
+│            "Ventilation_System_ESP ": "password",
+│            "Irrigation_System_ESP": "password"
+│        }
+│
+│        # Constants
+│        DEFAULT_USER_ID = 5000  # Server user
+│        TEMP_THRESHOLD = 30
+│        HUM_THRESHOLD = 40
+│        SOIL_MOISTURE_THRESHOLD = 30
+│
+│        # Actuator Names
+│        INTAKE_SHUTTER = "intake_shutter"
+│        WATER_PUMP = "water_pump"
+│        VENTILATION_FAN = "ventilation_fan"
+│
+│        # Device Names
+│        Ventilation_System_ESP = 1111
+│        Irrigation_System_ESP = 2222
+│
+│
+│        def log_user_action(session, device_id, action, user_id):
+│            interaction = UserInteraction(
+│                DeviceID=device_id,
+│                Action=action,
+│                UserID=user_id,
+│                Timestamp=datetime.utcnow()
+│            )
+│            session.add(interaction)
+│
+│
+│        def control_actuator(session, actuator_name, status, user_id):
+│            actuator = session.query(Actuator).filter_by(ActuatorName=actuator_name).first()
+│            if not actuator:
+│                actuator = Actuator(ActuatorName=actuator_name, Status=status, LastUpdated=datetime.utcnow(), UserID=user_id)
+│                session.add(actuator)
+│            else:
+│                actuator.Status = status
+│                actuator.LastUpdated = datetime.utcnow()
+│                actuator.UserID = user_id
+│
+│            # Log who triggered this actuator
+│            log_user_action(session, device_id=actuator.ActuatorID, action=f"{actuator_name}_{status.lower()}", user_id=user_id)
+│            return True
+│
+│
+│        def action_based_on_sensor(DeviceName, temperature=0, humidity=0, soil_moisture=0, user_id=DEFAULT_USER_ID):        
+│            session = SessionLocal()
+│
+│            try:
+│                if  temperature > TEMP_THRESHOLD or humidity > HUM_THRESHOLD:
+│
+│                    control_actuator(session, VENTILATION_FAN, "On", user_id)
+│                    control_actuator(session, INTAKE_SHUTTER, "On", user_id)
+│                    log_user_action(session, Ventilation_System_ESP,"On", user_id)
+│                    log_user_action(session, INTAKE_SHUTTER,"On", user_id)
+│                    action_taken = "VENTILATION_System_on"
+│
+│
+│                elif soil_moisture < SOIL_MOISTURE_THRESHOLD:
+│                    control_actuator(session, WATER_PUMP, "On", user_id)
+│                    log_user_action(session, Irrigation_System_ESP, "On", user_id)
+│                    action_taken = "Irrigation_System_on"
+│
+│                session.commit()
+│                return action_taken
+│
+│            except Exception as e:
+│                session.rollback()
+│                print(f"[ERROR] Failed to perform action: {e}")
+│                return "error"
+│
+│            finally:
+│                session.close()
+│
+│
+│        def store_sensor_data(device_id, DeviceName, temperature=None, filtered_temperature=None, humidity=None, filtered_humidity=None, soil_moisture=None, filtered_soil_moisture= None):
+│            session = SessionLocal()
+│
+│            try:
+│                # Ensure device exists
+│                device = session.query(Device).filter_by(DeviceID=device_id).first()
+│                if not device:
+│                    device = Device(DeviceID=device_id, DeviceName=DeviceName, Type="ESP32", Location="Unknown", Status="Active")
+│                    session.add(device)
+│                    session.commit()
+│                    session.refresh(device)
+│
+│                # Store relevant sensor data
+│                if temperature is not None and device_id in {1, 2, 3, 4}:
+│                    session.add(SensorData(DeviceID=device_id, SensorType="temperature", Value=temperature, Timestamp=datetime.utcnow()))
+│                if filtered_temperature is not None and device_id in {1, 2, 3, 4}:
+│                    session.add(SensorData(DeviceID=device_id, FusedValue=temperature, Timestamp=datetime.utcnow()))        
+│                if humidity is not None and device_id in {5, 6, 7, 8}:
+│                    session.add(SensorData(DeviceID=device_id, SensorType="humidity", Value=humidity, Timestamp=datetime.utcnow()))
+│                if filtered_humidity is not None and device_id in {5, 6, 7, 8}:
+│                    session.add(SensorData(DeviceID=device_id, FusedValue=temperature, Timestamp=datetime.utcnow()))        
+│                if soil_moisture is not None and device_id in {9,10}:
+│                    session.add(SensorData(DeviceID=device_id, SensorType="soil_moisture", Value=soil_moisture, Timestamp=datetime.utcnow()))
+│                if filtered_soil_moisture is not None and device_id in {9,10}:
+│                    session.add(SensorData(DeviceID=device_id, FusedValue=temperature, Timestamp=datetime.utcnow()))        
+│                session.commit()
+│
+│            except Exception as e:
+│                session.rollback()
+│                print(f"[ERROR] Failed to store sensor data: {e}")
+│            finally:
+│                session.close()
+│
+│
+│        def receive_sensor_data(request):
+│            # Basic HTTP Auth
+│            auth = request.authorization
+│            if not auth or credentials.get(auth.username) != auth.password:
+│                return jsonify({"error": "Unauthorized"}), 401
+│
+│            try:
+│                data = request.json
+│                if not data:
+│                    return jsonify({"error": "Invalid or missing JSON payload"}), 400
+│
+│                DeviceID = data.get('DeviceID')
+│                DeviceName = data.get('DeviceName')
+│                temperature = data.get('temperature')
+│                filtered_temperature = data.get('filtered_temperature')
+│                humidity = data.get('humidity')
+│                filtered_humidity = data.get('filtered_humidity')
+│                soil_moisture = data.get('soil_moisture')
+│                filtered_soil_moisture = data.get('filtered_soil_moisture')
+│
+│                if not DeviceID:
+│                    return jsonify({"error": "Missing 'DeviceID' in payload"}), 400
+│                if not DeviceName:
+│                    return jsonify({"error": "Missing 'DeviceName' in payload"}), 400
+│
+│                print(f"Received payload: from {DeviceName}")
+│
+│                store_sensor_data(DeviceID, DeviceName, temperature, humidity, soil_moisture)
+│
+│                process_weighted_fusion()
+│
+│
+│                action = action_based_on_sensor(DeviceName, temperature, humidity, soil_moisture)
+│
+│                if action == "VENTILATION_System_on":
+│                    return jsonify({"DeviceName": "Ventilation_System_ESP", "action": action})
+│
+│                elif action == "Irrigation_System_on":
+│                    return jsonify({"DeviceName": "Irrigation_System_ESP", "action": action})
+│
+│                elif action == "error":
+│                    return jsonify({"error": "Failed to perform action"}), 500
+│
+│                else:
+│                    return jsonify({"DeviceName": DeviceName, "action": "No action taken"}), 200
+│
+│
+│            except Exception as e:
+│                print(f"[ERROR] Exception in receive_sensor_data: {e}")
+│                return jsonify({"error": "Internal Server Error"}), 500
+│        ↑↑↑ END OF FILE ↑↑↑
+
+├── webserver.code-workspace
+└── weightedAverage.py
+     ↓↓↓ FILE CONTENT ↓↓↓
+     from datetime import datetime, timedelta
+     from sqlalchemy.orm import Session
+     from database_setup import KalmanFilterFusionData, WeightedAverageFusionData, SessionLocal
+
+
+     def weighted_average_fusion(values, weights):
+         """Perform weighted average of given values with weights."""
+         if len(values) != len(weights):
+             raise ValueError("Length of values and weights must match.")
+         return sum(v * w for v, w in zip(values, weights))
+
+
+     def fetch_recent_sensor_data(session, sensor_ids, window_seconds):
+         """Fetch the most recent Kalman-filtered readings for given sensor_ids within time window."""
+         now = datetime.utcnow()
+         window_start = now - timedelta(seconds=window_seconds)
+         latest_data = {}
+
+         for sensor_id in sensor_ids:
+             entry = session.query(KalmanFilterFusionData)\
+                 .filter(KalmanFilterFusionData.SensorID == sensor_id)\
+                 .filter(KalmanFilterFusionData.Timestamp >= window_start)\
+                 .order_by(KalmanFilterFusionData.Timestamp.desc())\
+                 .first()
+             if entry:
+                 latest_data[sensor_id] = entry.FusedValue
+
+         return latest_data
+
+
+     def process_weighted_fusion(sensor_ids, weights, sensor_type, fusion_window_seconds=60):
+         """
+         Run weighted average fusion on a given set of sensor IDs and weights.
+
+         Args:
+             sensor_ids (list): List of sensor IDs.
+             weights (list): Corresponding weights (same length as sensor_ids).
+             sensor_type (str): Sensor type label (e.g., "Temperature", "Humidity").
+             fusion_window_seconds (int): Time window in seconds to consider valid readings.
+         """
+         session: Session = SessionLocal()
+         try:
+             sensor_data = fetch_recent_sensor_data(session, sensor_ids, fusion_window_seconds)
+
+             if not sensor_data:
+                 print(f"[{sensor_type.upper()}] No recent readings available.")
+                 return
+
+             available_ids = list(sensor_data.keys())
+             available_values = [sensor_data[sid] for sid in available_ids]
+
+             # Adjust weights to match available sensors
+             weight_map = {sid: w for sid, w in zip(sensor_ids, weights)}
+             available_weights = [weight_map[sid] for sid in available_ids]
+
+
+             # Normalize weights
+             total_weight = sum(available_weights)
+             normalized_weights = [w / total_weight for w in available_weights]
+
+             fused_value = weighted_average_fusion(available_values, normalized_weights)
+
+             session.add(WeightedAverageFusionData(
+                 SensorType=sensor_type,
+                 Timestamp=datetime.utcnow(),
+                 FusedValue=fused_value
+             ))
+             session.commit()
+             print(f"[{sensor_type.upper()}] Fused value: {fused_value:.2f} from {len(available_values)} sensors.")
+         except Exception as e:
+             session.rollback()
+             print(f"[ERROR] Fusion failed for {sensor_type}: {e}")
+         finally:
+             session.close()
+     ↑↑↑ END OF FILE ↑↑↑
+
+PS D:\Documents\My AAST\Term 9\Graduation Project\Greenhouse\webdevelopment>

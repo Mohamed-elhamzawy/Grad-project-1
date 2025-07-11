@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Welcome to the AI-driven Greenhouse</h1>
+</div>
+
+<!-- Device Control Panel -->
+<div class="control-panel">
+    <h2>Actuator Control</h2>
+    <!-- Manual/Automatic Toggle Button -->
+    <label for="mode-toggle">🛠️ Control Mode:</label>
+    <button id="mode-toggle" class="control-btn off" onclick="toggleMode()">Manual Mode: OFF</button>
+
+    <!-- Manual Control Buttons -->
+    <button id="vent-btn" class="control-btn off" onclick="toggleSingle('vent', 2009)">Ventilation: OFF</button>
+    <button id="irrig-btn" class="control-btn off" onclick="toggleSingle('irrig', 3009)">Irrigation: OFF</button>
+</div>
+
+<!-- Threshold Slider Panel -->
+<div class="slider-panel">
+    <h2>Threshold Settings</h2>
+    <label>Temperature Threshold: <span id="tempValue">27</span>°C</label>
+    <input type="range" id="tempSlider" min="10" max="50" value="27" oninput="updateSlider('temp')">
+    
+    <label>Humidity Threshold: <span id="humValue">80</span>%</label>
+    <input type="range" id="humSlider" min="30" max="100" value="80" oninput="updateSlider('hum')">
+    
+    <label>Soil Moisture Threshold: <span id="soilValue">4000</span></label>
+    <input type="range" id="soilSlider" min="500" max="6000" value="4000" oninput="updateSlider('soil')">
+    
+    <button onclick="saveThresholds()">Save Thresholds</button>
+</div>
+
+<!-- Live Status Display -->
+<div class="container">
+    <div class="status-container">
+        <div class="status-box">
+            <h2>🌡️ Temperature</h2>
+            <p id="temp-value">-- °C</p>
+        </div>
+        <div class="status-box">
+            <h2>💧 Humidity</h2>
+            <p id="humidity-value">-- %</p>
+        </div>
+        <div class="status-box">
+            <h2>🌱 Soil Moisture</h2>
+            <p id="soil-value">--</p>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Stream -->
+<div class="container">
+    <h1>Surveillance</h1>
+    <p>Two cameras for monitoring.</p>
+    <img id="camera-stream" src="http://192.168.8.20:81/stream" width="400" height="400" alt="ESP32-CAM Stream"
+         onerror="this.onerror=null; this.src='static/no-signal.jpg';">
+</div>
+
+<script>
+function updateSlider(type) {
+    if (type === 'temp') {
+        document.getElementById('tempValue').textContent = document.getElementById('tempSlider').value;
+    } else if (type === 'hum') {
+        document.getElementById('humValue').textContent = document.getElementById('humSlider').value;
+    } else if (type === 'soil') {
+        document.getElementById('soilValue').textContent = document.getElementById('soilSlider').value;
+    }
+}
+
+async function saveThresholds() {
+    const data = {
+        temp_threshold: document.getElementById('tempSlider').value,
+        hum_threshold: document.getElementById('humSlider').value,
+        soil_moisture_threshold: document.getElementById('soilSlider').value
+    };
+
+    const res = await fetch('/set_thresholds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    alert(result.message || 'Saved');
+}
+
+async function toggleSingle(id, actuatorId) {
+    const modeBtn = document.getElementById("mode-toggle");
+    if (!modeBtn.classList.contains("on")) {
+        alert("Please enable manual mode first");
+        return;
+    }
+
+    const btn = document.getElementById(`${id}-btn`);
+    const isOn = btn.classList.contains("on");
+    const newState = isOn ? "off" : "on";
+
+    const res = await fetch('/get_manual_mode');
+    const current = await res.json();
+
+    const updated = {
+        ...current,
+        [`${id === 'vent' ? 'ventilation' : 'irrigation'}_actuator_state`]: newState
+    };
+
+    const response = await fetch('/set_manual_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+    });
+    const result = await response.json();
+
+    if (result.status === "success") {
+        btn.classList.toggle("on", newState === "on");
+        btn.classList.toggle("off", newState !== "on");
+        btn.innerText = `${capitalize(id)}: ${newState.toUpperCase()}`;
+    } else {
+        alert("Error updating actuator state");
+    }
+}
+
+async function toggleMode() {
+    const modeBtn = document.getElementById("mode-toggle");
+    const newState = !modeBtn.classList.contains("on");
+
+    const res = await fetch('/get_manual_mode');
+    const current = await res.json();
+
+    const updated = {
+        ...current,
+        manual_mode: newState
+    };
+
+    const response = await fetch('/set_manual_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+    });
+    const result = await response.json();
+
+    if (result.status === "success") {
+        modeBtn.classList.toggle("on", newState);
+        modeBtn.classList.toggle("off", !newState);
+        modeBtn.innerText = `Manual Mode: ${newState ? "ON" : "OFF"}`;
+
+        const ventBtn = document.getElementById("vent-btn");
+        const irrigBtn = document.getElementById("irrig-btn");
+
+        ventBtn.disabled = !newState;
+        irrigBtn.disabled = !newState;
+        ventBtn.classList.toggle("disabled", !newState);
+        irrigBtn.classList.toggle("disabled", !newState);
+    } else {
+        alert("Error updating control mode");
+    }
+}
+
+function capitalize(word) {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+async function fetchReadings() {
+    try {
+        const res = await fetch('/get_latest_readings');
+        const data = await res.json();
+
+        if (data.temperature !== null) {
+            document.getElementById("temp-value").textContent = `${data.temperature} °C`;
+        }
+
+        if (data.humidity !== null) {
+            document.getElementById("humidity-value").textContent = `${data.humidity} %`;
+        }
+
+        if (data.soil_moisture !== null) {
+            document.getElementById("soil-value").textContent = `${data.soil_moisture}`;
+        }
+    } catch (err) {
+        console.error("Failed to fetch sensor readings:", err);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    updateSlider('temp');
+    updateSlider('hum');
+    updateSlider('soil');
+
+    fetchReadings();                     // first call on page load
+    setInterval(fetchReadings, 10000);   // call every 10 seconds
+
+    fetch('/get_manual_mode')
+        .then(res => res.json())
+        .then(data => {
+            const modeBtn = document.getElementById("mode-toggle");
+            const ventBtn = document.getElementById("vent-btn");
+            const irrigBtn = document.getElementById("irrig-btn");
+            const isManual = data.manual_mode;
+
+            // Update manual mode toggle button
+            modeBtn.classList.toggle("on", isManual);
+            modeBtn.classList.toggle("off", !isManual);
+            modeBtn.innerText = `Manual Mode: ${isManual ? "ON" : "OFF"}`;
+
+            // Enable or disable control buttons
+            ventBtn.disabled = !isManual;
+            irrigBtn.disabled = !isManual;
+            ventBtn.classList.toggle("disabled", !isManual);
+            irrigBtn.classList.toggle("disabled", !isManual);
+
+            // Update Ventilation button state
+            if (data.ventilation_actuator_state === "on") {
+                ventBtn.classList.add("on");
+                ventBtn.classList.remove("off");
+                ventBtn.innerText = "Ventilation: ON";
+            } else {
+                ventBtn.classList.add("off");
+                ventBtn.classList.remove("on");
+                ventBtn.innerText = "Ventilation: OFF";
+            }
+
+            // Update Irrigation button state
+            if (data.irrigation_actuator_state === "on") {
+                irrigBtn.classList.add("on");
+                irrigBtn.classList.remove("off");
+                irrigBtn.innerText = "Irrigation: ON";
+            } else {
+                irrigBtn.classList.add("off");
+                irrigBtn.classList.remove("on");
+                irrigBtn.innerText = "Irrigation: OFF";
+            }
+        })
+        .catch(err => console.warn("Failed to fetch manual mode state:", err));
+});
+</script>
+
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, sans-serif; }
+.container { padding: 20px; margin-left: 270px; transition: margin-left 0.3s ease; }
+.control-panel, .slider-panel {
+    width: 240px;
+    padding: 15px;
+    background-color: #f4f4f4;
+    border-radius: 10px;
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+    position: fixed;
+    left: 20px;
+    z-index: 10;
+}
+.control-panel { top: 100px; }
+.slider-panel { bottom: 10%; background-color: #f9f9f9; }
+.control-btn {
+    display: block;
+    width: 100%;
+    margin: 10px 0;
+    padding: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.on { background-color: green; color: white; }
+.off { background-color: red; color: white; }
+.disabled { opacity: 0.5; cursor: not-allowed; }
+.slider-panel label { margin-top: 10px; display: block; }
+.slider-panel input[type="range"] { width: 100%; }
+.slider-panel button {
+    margin-top: 15px;
+    width: 100%;
+    padding: 10px;
+    font-weight: bold;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.status-container {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 30px;
+    margin: 40px 0;
+}
+.status-box {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    text-align: center;
+    width: 30%;
+    min-width: 220px;
+    flex: 1 1 250px;
+}
+.status-box h2 { margin-bottom: 10px; font-size: 1.4rem; color: #2c3e50; }
+.status-box p { font-size: 2rem; font-weight: bold; color: #2c7be5; }
+img#camera-stream {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin-top: 20px;
+}
+
+@media (max-width: 992px) {
+    .container { margin-left: 0; padding: 15px; }
+    .control-panel, .slider-panel {
+        position: static;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    .status-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    .status-box {
+        width: 90%;
+        max-width: 400px;
+    }
+}
+</style>
+{% endblock %}
